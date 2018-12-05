@@ -435,57 +435,134 @@ setMethod("sc3_calc_transfs", signature(object = "SingleCellExperiment"), sc3_ca
 #' @importFrom doParallel registerDoParallel
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @importFrom stats kmeans
-sc3_kmeans.SingleCellExperiment <- function(object, ks) {
+#' @importFrom ClusterR KMeans_arma predict_KMeans KMeans_rcpp
+#' @importFrom knor Kmeans
+sc3_kmeans_test <- function(object, ks, kmeans_alg) {
     if (is.null(ks)) {
         stop(paste0("Please provide a range of the number of clusters `ks` to be used by SC3!"))
         return(object)
     }
-    
+
+    if (kmeans_alg %in% c('stats', 'cr-arma', 'cr-rcpp', 'knor') == FALSE){
+        stop(paste0("Please provide a valid clustering algorithm: 'stats', 'cr-arma', 'cr-rcpp', 'knor'."))
+        return(object)
+    }
+
     transfs <- metadata(object)$sc3$transformations
     if (is.null(transfs)) {
         stop(paste0("Please run sc3_calc_transfs() first!"))
         return(object)
     }
-    
+
     # NULLing the variables to avoid notes in R CMD CHECK
     i <- NULL
-    
+
     n_dim <- metadata(object)$sc3$n_dim
-    
+
     hash.table <- expand.grid(transf = names(transfs), ks = ks, n_dim = n_dim, stringsAsFactors = FALSE)
-    
+
     message("Performing k-means clustering...")
-    
+
     n_cores <- metadata(object)$sc3$n_cores
-    
+
     kmeans_iter_max <- metadata(object)$sc3$kmeans_iter_max
     kmeans_nstart <- metadata(object)$sc3$kmeans_nstart
-    
+
     cl <- parallel::makeCluster(n_cores, outfile = "")
     doParallel::registerDoParallel(cl, cores = n_cores)
-    
+
     pb <- utils::txtProgressBar(min = 1, max = nrow(hash.table), style = 3)
-    
+
+    kmeans_func <- function(x, k, kmeans_alg, kmeans_iter_max, kmeans_nstart){
+        if (kmeans_alg == 'stats')
+            t <- stats::kmeans(x, k, iter.max = kmeans_iter_max,
+            nstart = kmeans_nstart)$cluster
+        else if (kmeans_alg == 'cr-arma'){
+            arma <- ClusterR::KMeans_arma(x, clusters = k,
+                        n_iter = 100, seed_mode = "random_subset", verbose = F, CENTROIDS = NULL)
+            t <- ClusterR::predict_KMeans(x, arma)
+        }
+        else if (kmeans_alg == 'cr-rcpp')
+            t <- ClusterR::KMeans_rcpp(x, k, max_iters = 1000,
+                        initializer = 'kmeans++')$cluster
+        else if (kmeans_alg == 'knor')
+            t <- knor::Kmeans(x, k)$cluster
+        return (t)
+    }
+
     # calculate the 6 distinct transformations in parallel
     labs <- foreach::foreach(i = 1:nrow(hash.table)) %dorng% {
         try({
             utils::setTxtProgressBar(pb, i)
             transf <- get(hash.table$transf[i], transfs)
-            stats::kmeans(transf[, 1:hash.table$n_dim[i]], hash.table$ks[i], iter.max = kmeans_iter_max, 
-                nstart = kmeans_nstart)$cluster
+            kmeans_func(
+                transf[, 1:hash.table$n_dim[i]], hash.table$ks[i],
+                kmeans_alg, kmeans_iter_max, kmeans_nstart
+            )
         })
     }
-    
+
     close(pb)
-    
+
     # stop local cluster
     parallel::stopCluster(cl)
-    
+
     names(labs) <- paste(hash.table$transf, hash.table$ks, hash.table$n_dim, sep = "_")
-    
+
     metadata(object)$sc3$kmeans <- labs
     return(object)
 }
+# sc3_kmeans.SingleCellExperiment <- function(object, ks) {
+#     if (is.null(ks)) {
+#         stop(paste0("Please provide a range of the number of clusters `ks` to be used by SC3!"))
+#         return(object)
+#     }
+#     
+#     transfs <- metadata(object)$sc3$transformations
+#     if (is.null(transfs)) {
+#         stop(paste0("Please run sc3_calc_transfs() first!"))
+#         return(object)
+#     }
+#     
+#     # NULLing the variables to avoid notes in R CMD CHECK
+#     i <- NULL
+#     
+#     n_dim <- metadata(object)$sc3$n_dim
+#     
+#     hash.table <- expand.grid(transf = names(transfs), ks = ks, n_dim = n_dim, stringsAsFactors = FALSE)
+#     
+#     message("Performing k-means clustering...")
+#     
+#     n_cores <- metadata(object)$sc3$n_cores
+#     
+#     kmeans_iter_max <- metadata(object)$sc3$kmeans_iter_max
+#     kmeans_nstart <- metadata(object)$sc3$kmeans_nstart
+#     
+#     cl <- parallel::makeCluster(n_cores, outfile = "")
+#     doParallel::registerDoParallel(cl, cores = n_cores)
+#     
+#     pb <- utils::txtProgressBar(min = 1, max = nrow(hash.table), style = 3)
+#     
+#     # calculate the 6 distinct transformations in parallel
+#     labs <- foreach::foreach(i = 1:nrow(hash.table)) %dorng% {
+#         try({
+#             utils::setTxtProgressBar(pb, i)
+#             transf <- get(hash.table$transf[i], transfs)
+#             stats::kmeans(transf[, 1:hash.table$n_dim[i]], hash.table$ks[i], iter.max = kmeans_iter_max, 
+#                 nstart = kmeans_nstart)$cluster
+#         })
+#     }
+#     
+#     close(pb)
+#     
+#     # stop local cluster
+#     parallel::stopCluster(cl)
+#     
+#     names(labs) <- paste(hash.table$transf, hash.table$ks, hash.table$n_dim, sep = "_")
+#     
+#     metadata(object)$sc3$kmeans <- labs
+#     return(object)
+# }
 
 #' @rdname sc3_kmeans
 #' @aliases sc3_kmeans
