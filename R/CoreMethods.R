@@ -54,7 +54,7 @@ sc3.SingleCellExperiment <- function(object, ks, gene_filter, pct_dropout_min, p
     }
     object <- sc3_calc_dists(object)
     object <- sc3_calc_transfs(object)
-    object <- sc3_kmeans(object, ks)
+    object <- sc3_kmeans(object, ks, kmeans_alg = 'stats')
     object <- sc3_calc_consens(object)
     if (biology) {
         object <- sc3_calc_biology(object, ks)
@@ -437,7 +437,7 @@ setMethod("sc3_calc_transfs", signature(object = "SingleCellExperiment"), sc3_ca
 #' @importFrom stats kmeans
 #' @importFrom ClusterR KMeans_arma predict_KMeans KMeans_rcpp
 #' @importFrom knor Kmeans
-sc3_kmeans_test <- function(object, ks, kmeans_alg) {
+sc3_kmeans.SingleCellExperiment <- function(object, ks, kmeans_alg) {
     if (is.null(ks)) {
         stop(paste0("Please provide a range of the number of clusters `ks` to be used by SC3!"))
         return(object)
@@ -483,10 +483,10 @@ sc3_kmeans_test <- function(object, ks, kmeans_alg) {
             t <- ClusterR::predict_KMeans(x, arma)
         }
         else if (kmeans_alg == 'cr-rcpp')
-            t <- ClusterR::KMeans_rcpp(x, k, max_iters = 1000,
+            t <- ClusterR::KMeans_rcpp(x, k, num_init = 10, max_iters = 10000,
                         initializer = 'kmeans++')$cluster
         else if (kmeans_alg == 'knor')
-            t <- knor::Kmeans(x, k)$cluster
+            t <- knor::Kmeans(x, k, init = "kmeanspp")$cluster
         return (t)
     }
 

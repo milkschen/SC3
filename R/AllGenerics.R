@@ -32,7 +32,7 @@ setGeneric("sc3_calc_transfs", signature = "object", function(object) {
 })
 
 #' @export
-setGeneric("sc3_kmeans", signature = "object", function(object, ks = NULL) {
+setGeneric("sc3_kmeans", signature = "object", function(object, ks = NULL, kmeans_alg = 'stats') {
     standardGeneric("sc3_kmeans")
 })
 
