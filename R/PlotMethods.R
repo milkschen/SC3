@@ -47,6 +47,54 @@ sc3_plot_consensus.SingleCellExperiment <- function(object, k, show_pdata) {
 #' @aliases sc3_plot_consensus
 setMethod("sc3_plot_consensus", signature(object = "SingleCellExperiment"), sc3_plot_consensus.SingleCellExperiment)
 
+#' Plot consensus matrix as a heatmap
+#' 
+#' Works the same as sc3_plot_consensus, but hide dendrogram
+#' 
+#' @name sc3_plot_consensus_nd
+#' @aliases sc3_plot_consensus_nd, sc3_plot_consensus_nd,SingleCellExperiment-method
+#' 
+#' @param object an object of 'SingleCellExperiment' class
+#' @param k number of clusters
+#' @param show_pdata a vector of colnames of the pData(object) table. Default is NULL.
+#' If not NULL will add pData annotations to the columns of the output matrix
+#' 
+#' @importFrom pheatmap pheatmap
+sc3_plot_consensus_nd.SingleCellExperiment <- function(object, k, show_pdata) {
+    if (is.null(metadata(object)$sc3$consensus)) {
+        warning(paste0("Please run sc3_consensus() first!"))
+        return(object)
+    }
+    hc <- metadata(object)$sc3$consensus[[as.character(k)]]$hc
+    consensus <- metadata(object)$sc3$consensus[[as.character(k)]]$consensus
+    
+    add_ann_col <- FALSE
+    ann <- NULL
+    if (!is.null(show_pdata)) {
+        ann <- make_col_ann_for_heatmaps(object, show_pdata)
+        if (!is.null(ann)) {
+            add_ann_col <- TRUE
+            # make same names for the annotation table
+            rownames(ann) <- colnames(consensus)
+        }
+    }
+    do.call(pheatmap::pheatmap, 
+        c(
+            list(consensus, cluster_rows = hc, cluster_cols = hc, cutree_rows = k, 
+            treeheight_row = 0, treeheight_col = 0,
+            cutree_cols = k, show_rownames = FALSE, show_colnames = FALSE), 
+            list(annotation_col = ann)[add_ann_col]
+        )
+    )
+    #do.call(pheatmap::pheatmap, #treeheight_row = 0, treeheight_col = 0,
+    #    c(list(consensus, cluster_rows = hc, cluster_cols = hc, cutree_rows = k, 
+    #    cutree_cols = k, show_rownames = FALSE, show_colnames = FALSE), list(annotation_col = ann)[add_ann_col]))
+}
+
+#' @rdname sc3_plot_consensus_nd
+#' @aliases sc3_plot_consensus_nd
+setMethod("sc3_plot_consensus_nd", signature(object = "SingleCellExperiment"), sc3_plot_consensus_nd.SingleCellExperiment)
+
 #' Plot silhouette indexes of the cells
 #' 
 #' A silhouette is a quantitative measure of the diagonality of the consensus 

@@ -482,11 +482,16 @@ sc3_kmeans.SingleCellExperiment <- function(object, ks, kmeans_alg) {
                         n_iter = 100, seed_mode = "random_subset", verbose = F, CENTROIDS = NULL)
             t <- ClusterR::predict_KMeans(x, arma)
         }
-        else if (kmeans_alg == 'cr-rcpp')
-            t <- ClusterR::KMeans_rcpp(x, k, num_init = 10, max_iters = 10000,
+        else if (kmeans_alg == 'cr-rcpp'){
+            num_i <- 10
+            print (num_i)
+            t <- ClusterR::KMeans_rcpp(x, k, num_init = num_i, max_iters = 500,
                         initializer = 'kmeans++')$cluster
+        }
         else if (kmeans_alg == 'knor')
             t <- knor::Kmeans(x, k, init = "kmeanspp")$cluster
+            #t <- knor::Kmeans(x, k, init = "kmeanspp", iter.max = 1000000000)$cluster
+            #t <- knor::Kmeans(x, k, init = "kmeanspp", iter.max = 10000)$cluster
         return (t)
     }
 
